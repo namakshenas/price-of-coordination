@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Price of Coordination</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#eef1f5;
+    --panel:#f8fafc;
+    --panel-line:#d3dae3;
+    --ink:#161f2b;
+    --ink-soft:#5a6875;
+    --ink-faint:#8b97a4;
+    --cost:#b5651d;        /* copper — costs of coordinating */
+    --cost-2:#c98a3f;
+    --cost-3:#ddad72;
+    --cost-4:#eccea2;
+    --cost-5:#f4e2c6;
+    --benefit:#12897a;     /* teal — what coordination saves */
+    --benefit-2:#3aa89a;
+    --benefit-3:#6cc2b6;
+    --benefit-4:#a2d9d1;
+    --accent:#2e5fe6;      /* electric blue — controls & markers */
+    --warn:#c0392b;
+    --wash-cost:rgba(181,101,29,.06);
+    --wash-benefit:rgba(18,137,122,.06);
+    --shadow:0 1px 2px rgba(22,31,43,.06),0 8px 30px rgba(22,31,43,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Inter",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 22px 60px;}
+
+  /* ---------- Header ---------- */
+  header{margin-bottom:22px;}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:10px;}
+  h1{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:clamp(30px,5vw,46px);
+    line-height:1.02;letter-spacing:-.02em;margin:0 0 12px;}
+  .lede{font-size:15.5px;line-height:1.55;color:var(--ink-soft);max-width:64ch;margin:0;}
+  .formula{margin-top:16px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+    line-height:1.7;color:var(--ink);background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:10px;padding:12px 15px;overflow-x:auto;}
+  .formula b{color:var(--cost);font-weight:600;}
+  .formula i{color:var(--benefit);font-style:normal;font-weight:600;}
+
+  /* ---------- Layout ---------- */
+  .grid{display:grid;grid-template-columns:270px 1fr;gap:20px;margin-top:24px;}
+  @media(max-width:820px){.grid{grid-template-columns:1fr;}}
+
+  .card{background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;
+    box-shadow:var(--shadow);}
+  .controls{padding:18px 18px 20px;align-self:start;}
+  .ctrl-title{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:13px;
+    letter-spacing:.01em;margin:0 0 4px;}
+  .ctrl-sub{font-size:12px;color:var(--ink-faint);margin:0 0 18px;line-height:1.45;}
+
+  .field{margin-bottom:20px;}
+  .field > label{display:block;font-size:12.5px;font-weight:600;margin-bottom:7px;color:var(--ink);}
+  .field .hint{font-size:11.5px;color:var(--ink-faint);line-height:1.4;margin-top:6px;}
+
+  .seg{display:flex;background:#e7ecf2;border-radius:9px;padding:3px;gap:2px;}
+  .seg button{flex:1;border:0;background:transparent;font-family:"Inter",sans-serif;
+    font-size:11.5px;font-weight:500;color:var(--ink-soft);padding:7px 4px;border-radius:6px;
+    cursor:pointer;transition:background .15s,color .15s;line-height:1.2;}
+  .seg button[aria-pressed="true"]{background:#fff;color:var(--ink);
+    box-shadow:0 1px 2px rgba(22,31,43,.12);font-weight:600;}
+
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent) var(--fill,50%),#d7dee6 var(--fill,50%));
+    outline:none;margin:2px 0;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:2px solid var(--accent);cursor:pointer;box-shadow:0 1px 3px rgba(22,31,43,.25);}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;
+    border:2px solid var(--accent);cursor:pointer;}
+  input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:4px;}
+  .range-val{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--accent);float:right;font-weight:500;}
+
+  .presets{display:flex;gap:6px;margin-top:2px;}
+  .presets button{flex:1;font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.02em;
+    text-transform:uppercase;border:1px solid var(--panel-line);background:#fff;color:var(--ink-soft);
+    padding:8px 4px;border-radius:7px;cursor:pointer;transition:.15s;}
+  .presets button:hover{border-color:var(--accent);color:var(--accent);}
+  .reset{margin-top:14px;width:100%;border:1px dashed var(--panel-line);background:transparent;
+    color:var(--ink-faint);font-size:11.5px;padding:8px;border-radius:7px;cursor:pointer;}
+  .reset:hover{color:var(--ink);border-color:var(--ink-faint);}
+
+  /* ---------- Chart ---------- */
+  .chart-card{padding:16px 14px 8px;position:relative;overflow:hidden;}
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;
+    padding:2px 8px 10px;flex-wrap:wrap;gap:8px;}
+  .chart-head h2{font-family:"Space Grotesk",sans-serif;font-size:15px;font-weight:600;margin:0;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:11px;height:11px;border-radius:3px;display:inline-block;}
+  svg{display:block;width:100%;height:auto;overflow:visible;}
+  .axis text{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--ink-faint);}
+  .axis line,.axis path{stroke:#c7cfd9;shape-rendering:crispEdges;}
+  .zero-line{stroke:var(--ink);stroke-width:1.4;}
+  .net-line{fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linejoin:round;stroke-linecap:round;}
+  .cross-line{stroke:var(--accent);stroke-width:1.4;stroke-dasharray:4 4;}
+  .band-label{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;fill:var(--ink-faint);}
+  .guide{stroke:var(--ink-faint);stroke-width:1;stroke-dasharray:3 3;opacity:0;}
+
+  /* ---------- Readout ---------- */
+  .readout{display:grid;grid-template-columns:auto 1fr;gap:4px 20px;align-items:baseline;
+    padding:14px 18px 4px;}
+  .verdict{grid-column:1 / -1;font-family:"Space Grotesk",sans-serif;font-weight:600;
+    font-size:16px;margin-bottom:4px;line-height:1.3;}
+  .verdict.pays{color:var(--benefit);}
+  .verdict.local{color:var(--cost);}
+  .big{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:30px;letter-spacing:-.01em;}
+  .big.pays{color:var(--benefit);} .big.local{color:var(--cost);}
+  .readout .k{font-size:11px;font-family:"IBM Plex Mono",monospace;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--ink-faint);}
+  .readout .yr{font-size:12.5px;color:var(--ink-soft);}
+
+  /* ---------- Tooltip ---------- */
+  .tt{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--panel-line);
+    border-radius:10px;box-shadow:var(--shadow);padding:10px 12px;font-size:11.5px;opacity:0;
+    transition:opacity .1s;min-width:190px;z-index:5;}
+  .tt h4{margin:0 0 8px;font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;
+    display:flex;justify-content:space-between;}
+  .tt .row{display:flex;justify-content:space-between;gap:14px;line-height:1.55;}
+  .tt .row.tot{border-top:1px solid var(--panel-line);margin-top:6px;padding-top:6px;font-weight:600;}
+  .tt .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;}
+  .tt .num{font-family:"IBM Plex Mono",monospace;}
+
+  footer{margin-top:26px;font-size:11.5px;color:var(--ink-faint);line-height:1.6;
+    border-top:1px solid var(--panel-line);padding-top:16px;}
+  footer b{color:var(--ink-soft);font-weight:600;}
+  footer a{color:var(--accent);text-decoration:none;}
+
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">EU electricity market · a proposed metric</div>
+    <h1>The Price of&nbsp;Coordination</h1>
+    <p class="lede">Coupling bidding zones is supposed to lower the total cost of electricity. But coordinating markets faster than you build the grid has its own bill — redispatch, interconnector capital, and transfers between zones. This metric nets that bill against what coupling actually saves, and asks the blunt question: in a given year, would going local have been cheaper?</p>
+    <div class="formula">
+      PoC(t) = [ <b>Redispatch + Interconnector capex + Loop-flows + Coordination overhead + w·Distributional transfer</b> ]
+      &nbsp;−&nbsp; [ <i>Dispatch savings + Reserve pooling + Avoided curtailment + Security of supply</i> ]<br>
+      <span style="color:var(--ink-faint)">PoC &gt; 0 → coordinating cost more than going local &nbsp;·&nbsp; PoC &lt; 0 → coordination paid for itself</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- CONTROLS -->
+    <div class="card controls">
+      <p class="ctrl-title">Assumptions</p>
+      <p class="ctrl-sub">Defaults are illustrative, anchored to ACER, JRC and ENTSO-E figures (see notes). Move the levers to stress-test the thesis.</p>
+
+      <div class="field">
+        <label>Savings baseline — “cheaper than <em>what</em>?”</label>
+        <div class="seg" id="baseline" role="group" aria-label="Savings baseline">
+          <button data-v="zero"    type="button">vs no trade</button>
+          <button data-v="incr"    type="button" aria-pressed="true">vs today</button>
+          <button data-v="copper"  type="button">vs full grid</button>
+        </div>
+        <p class="hint" id="baseline-hint"></p>
+      </div>
+
+      <div class="field">
+        <label>Grid-lag <span class="range-val" id="lag-val"></span></label>
+        <input type="range" id="lag" min="0" max="100" value="55" aria-label="Grid lag severity">
+        <p class="hint">How far transmission build-out trails the market. Higher = redispatch costs balloon (the JRC €11–103 bn/yr path).</p>
+      </div>
+
+      <div class="field">
+        <label>Weight on distributional transfers <span class="range-val" id="dist-val"></span></label>
+        <input type="range" id="dist" min="0" max="100" value="30" aria-label="Distributional weight">
+        <p class="hint">Coupling raises prices in low-cost zones to lower them elsewhere. A pure transfer (weight 0) or a real welfare loss for exporters (weight 1)?</p>
+      </div>
+
+      <div class="field">
+        <label>Scenario presets</label>
+        <div class="presets">
+          <button data-p="integrator" type="button">Integrator</button>
+          <button data-p="central" type="button">Central</button>
+          <button data-p="localist" type="button">Localist</button>
+        </div>
+        <button class="reset" id="reset" type="button">Reset to defaults</button>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div>
+      <div class="card chart-card">
+        <div class="chart-head">
+          <h2>Net Price of Coordination, EU-wide</h2>
+          <div class="legend">
+            <span><i class="sw" style="background:var(--cost)"></i>Coordination costs</span>
+            <span><i class="sw" style="background:var(--benefit)"></i>Coordination savings</span>
+            <span><i class="sw" style="background:var(--ink);height:3px;width:16px;border-radius:2px"></i>Net PoC</span>
+          </div>
+        </div>
+        <div id="chart"></div>
+        <div class="tt" id="tt"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <div class="readout" id="readout"></div>
+        <div style="padding:0 18px 16px;font-size:12.5px;color:var(--ink-soft);line-height:1.5;" id="verdict-note"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <b>How to read this.</b> Everything above the black line is a cost of running a coupled system; everything below is a saving it delivers. The bold line is the net. Where it crosses zero is the year coordination stops paying for itself under your assumptions.<br><br>
+    <b>Illustrative defaults, grounded in:</b> ACER put EU congestion-management cost at ≈ €4 bn in 2023 (~60% in Germany); the Commission’s JRC projects remedial-action costs of ≈ €11–26 bn/yr by 2030 and €34–103 bn/yr by 2040 if the grid expands only at historic rates. On the benefit side, ENTSO-E’s “zero-trade” counterfactual valued market coupling at ≈ €34 bn in 2021, while its TYNDP 2024 marginal case links ≈ €6 bn/yr of new interconnection to ≈ €13 bn/yr of added welfare. Numbers here are stylised for exploration — swap in your own series from the ENTSO-E Transparency Platform and ACER Market Monitoring Reports before citing anything.
+  </footer>
+</div>
+
+<script>
+"use strict";
+// ---------------------------------------------------------------------------
+// MODEL — all values are illustrative €bn/year, EU-wide, grounded in the
+// figures cited in the footer. Trajectories are functions of the year so the
+// tool can be re-pointed at real ENTSO-E / ACER series later.
+// ---------------------------------------------------------------------------
+const YEARS = d3.range(2018, 2036);
+const Y0 = 2018, YN = 2035, SPAN = YN - Y0;
+const frac = y => (y - Y0) / SPAN;                       // 0..1 across the window
+const lerp = (a,b,t) => a + (b-a)*t;
+
+// piecewise-linear interpolation over anchor points {year:value}
+function anchored(y, pts){
+  const ks = Object.keys(pts).map(Number).sort((a,b)=>a-b);
+  if (y<=ks[0]) return pts[ks[0]];
+  if (y>=ks[ks.length-1]) return pts[ks[ks.length-1]];
+  for(let i=0;i<ks.length-1;i++){
+    if(y>=ks[i] && y<=ks[i+1]) return lerp(pts[ks[i]],pts[ks[i+1]],(y-ks[i])/(ks[i+1]-ks[i]));
+  }
+}
+
+// --- COST components -------------------------------------------------------
+// Redispatch / congestion management: historical anchors, then the JRC ramp
+// whose steepness is governed by grid-lag g (0 = grid keeps up, 1 = worst case)
+function redispatch(y, g){
+  const hist = {2018:1.6,2019:1.8,2020:2.1,2021:2.6,2022:4.2,2023:4.0,2024:3.8};
+  if (y<=2024) return anchored(y,hist);
+  const t2030 = lerp(8, 26, g);      // JRC 2030 band €11–26bn (EU-wide, floored a touch)
+  const t2035 = lerp(12, 60, g);     // toward the JRC 2040 band, brought back to 2035
+  if (y<=2030) return lerp(3.8,  t2030, (y-2024)/6);
+  return lerp(t2030, t2035, (y-2030)/5);
+}
+const interconnector = y => 2.0 + 0.27*(y-Y0);           // amortised capex, ~€6.5bn by 2035
+const loopflow       = y => 0.30 + 0.85*frac(y);         // countertrading / unscheduled flows
+const overhead       = y => 0.20 + 0.28*frac(y);         // ACER/ENTSO-E/NEMO/TSO coordination
+const distributional = y => 2.0 + 7.0*frac(y);           // price-convergence transfer (pre-weight)
+
+// --- BENEFIT components ----------------------------------------------------
+// Dispatch/coupling welfare depends on the counterfactual you compare against
+function dispatch(y, baseline){
+  const t = frac(y);
+  if (baseline==='zero')   return lerp(28, 42, t);        // vs zero cross-border trade (€34bn '21)
+  if (baseline==='copper') return lerp(3.5, 7, t);        // vs an ideal fully-built grid
+  return lerp(10, 18, t);                                 // 'incr' — vs today's integration (~€13bn)
+}
+const reserve     = y => 2.0 + 2.5*frac(y);              // pooled backup capacity
+const curtailAvoid= y => 1.0 + 2.6*frac(y);              // renewables exported not curtailed
+const security    = y => 1.5 + 1.6*frac(y);              // avoided lost load via imports
+
+// --- assemble --------------------------------------------------------------
+const COSTKEYS = [
+  {k:'redispatch', label:'Redispatch & congestion', color:'var(--cost)'},
+  {k:'interconn',  label:'Interconnector capex',    color:'var(--cost-2)'},
+  {k:'loopflow',   label:'Loop-flows / countertrade',color:'var(--cost-3)'},
+  {k:'overhead',   label:'Coordination overhead',   color:'var(--cost-4)'},
+  {k:'dist',       label:'Distributional transfer', color:'var(--cost-5)'},
+];
+const BENKEYS = [
+  {k:'dispatch',   label:'Dispatch savings',        color:'var(--benefit)'},
+  {k:'reserve',    label:'Reserve pooling',         color:'var(--benefit-2)'},
+  {k:'curtail',    label:'Avoided curtailment',     color:'var(--benefit-3)'},
+  {k:'security',   label:'Security of supply',      color:'var(--benefit-4)'},
+];
+
+function buildData(p){
+  const g = p.lag/100, w = p.dist/100;
+  return YEARS.map(y=>{
+    const c = {
+      redispatch: redispatch(y,g),
+      interconn:  interconnector(y),
+      loopflow:   loopflow(y),
+      overhead:   overhead(y),
+      dist:       distributional(y)*w,
+    };
+    const b = {
+      dispatch:  dispatch(y,p.baseline),
+      reserve:   reserve(y),
+      curtail:   curtailAvoid(y),
+      security:  security(y),
+    };
+    const costTot = d3.sum(Object.values(c));
+    const benTot  = d3.sum(Object.values(b));
+    return {year:y, c, b, costTot, benTot, net: costTot-benTot};
+  });
+}
+
+// find sign-change year (net crossing from <0 to >0)
+function crossingYear(data){
+  for(let i=0;i<data.length-1;i++){
+    const a=data[i].net, b=data[i+1].net;
+    if(a<0 && b>=0){ return data[i].year + (0-a)/(b-a); }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------------------
+const DEFAULTS = {baseline:'incr', lag:55, dist:30};
+const PRESETS = {
+  integrator:{baseline:'zero',   lag:20, dist:10},
+  central:   {baseline:'incr',   lag:55, dist:30},
+  localist:  {baseline:'copper', lag:85, dist:75},
+};
+let state = {...DEFAULTS};
+
+// ---------------------------------------------------------------------------
+// CHART
+// ---------------------------------------------------------------------------
+const chartEl = document.getElementById('chart');
+const tt = document.getElementById('tt');
+const fmt = n => (n>=0?'+':'−') + '€' + Math.abs(n).toFixed(1) + 'bn';
+const fmtP = n => '€' + n.toFixed(1) + 'bn';
+
+let dims = {};
+function render(){
+  const data = buildData(state);
+  const W = chartEl.clientWidth || 700;
+  const H = Math.max(340, Math.min(430, W*0.52));
+  const m = {t:26,r:18,b:28,l:46};
+  const iw = W-m.l-m.r, ih = H-m.t-m.b;
+
+  d3.select(chartEl).selectAll('svg').remove();
+  const svg = d3.select(chartEl).append('svg')
+    .attr('viewBox',`0 0 ${W} ${H}`).attr('role','img')
+    .attr('aria-label','Diverging area chart of coordination costs, savings and net price over time');
+  const g = svg.append('g').attr('transform',`translate(${m.l},${m.t})`);
+
+  const x = d3.scaleLinear().domain([Y0,YN]).range([0,iw]);
+  const yMax = d3.max(data,d=>d.costTot)*1.06;
+  const yMin = -d3.max(data,d=>d.benTot)*1.06;
+  const y = d3.scaleLinear().domain([yMin,yMax]).range([ih,0]).nice();
+
+  // background washes (up = costs dominate, down = savings dominate)
+  g.append('rect').attr('x',0).attr('y',0).attr('width',iw).attr('height',y(0))
+    .attr('fill','var(--wash-cost)');
+  g.append('rect').attr('x',0).attr('y',y(0)).attr('width',iw).attr('height',ih-y(0))
+    .attr('fill','var(--wash-benefit)');
+
+  // gridlines
+  g.append('g').attr('class','axis')
+    .call(d3.axisLeft(y).ticks(6).tickSize(-iw).tickFormat(d=>d===0?'0':d))
+    .call(s=>s.select('.domain').remove())
+    .call(s=>s.selectAll('.tick line').attr('stroke','#dbe1e9'));
+
+  // stacked cost areas (upward from 0)
+  const areaGen = (y0f,y1f)=>d3.area().x(d=>x(d.year)).y0(d=>y(y0f(d))).y1(d=>y(y1f(d))).curve(d3.curveMonotoneX);
+  let baseC = ()=>0;
+  COSTKEYS.forEach(ck=>{
+    const b0 = baseC, b1 = d => b0(d) + d.c[ck.k];
+    g.append('path').datum(data).attr('fill',ck.color).attr('opacity',.92)
+      .attr('d', areaGen(b0,b1));
+    baseC = b1;
+  });
+  // stacked benefit areas (downward from 0)
+  let baseB = ()=>0;
+  BENKEYS.forEach(bk=>{
+    const b0 = baseB, b1 = d => b0(d) - d.b[bk.k];
+    g.append('path').datum(data).attr('fill',bk.color).attr('opacity',.92)
+      .attr('d', areaGen(b0,b1));
+    baseB = b1;
+  });
+
+  // band labels
+  g.append('text').attr('class','band-label').attr('x',6).attr('y',14).text('costs of coordinating');
+  g.append('text').attr('class','band-label').attr('x',6).attr('y',ih-8).text('what coordination saves');
+
+  // zero line
+  g.append('line').attr('class','zero-line').attr('x1',0).attr('x2',iw).attr('y1',y(0)).attr('y2',y(0));
+
+  // net line
+  const netLine = d3.line().x(d=>x(d.year)).y(d=>y(d.net)).curve(d3.curveMonotoneX);
+  g.append('path').datum(data).attr('class','net-line').attr('d',netLine);
+
+  // crossing marker
+  const cy = crossingYear(data);
+  if(cy){
+    g.append('line').attr('class','cross-line').attr('x1',x(cy)).attr('x2',x(cy)).attr('y1',0).attr('y2',ih);
+    const pill = g.append('g').attr('transform',`translate(${x(cy)},${-8})`);
+    const lbl = `break-even ≈ ${Math.round(cy)}`;
+    const tw = lbl.length*6.0+16;
+    pill.append('rect').attr('x',-tw/2).attr('y',-4).attr('width',tw).attr('height',18).attr('rx',9)
+      .attr('fill','var(--accent)');
+    pill.append('text').attr('text-anchor','middle').attr('y',9)
+      .attr('font-family','IBM Plex Mono, monospace').attr('font-size',10.5)
+      .attr('fill','#fff').text(lbl);
+  }
+
+  // x axis
+  g.append('g').attr('class','axis').attr('transform',`translate(0,${ih})`)
+    .call(d3.axisBottom(x).ticks(9).tickFormat(d3.format('d')))
+    .call(s=>s.select('.domain').attr('stroke','#c7cfd9'));
+
+  // interaction guide + hit area
+  const guide = g.append('line').attr('class','guide').attr('y1',0).attr('y2',ih);
+  const focus = g.append('circle').attr('r',4.5).attr('fill','var(--ink)')
+    .attr('stroke','#fff').attr('stroke-width',1.5).style('opacity',0);
+
+  svg.append('rect').attr('x',m.l).attr('y',m.t).attr('width',iw).attr('height',ih)
+    .attr('fill','transparent')
+    .on('mousemove',ev=>move(ev)).on('mouseleave',hide)
+    .on('touchmove',ev=>{ev.preventDefault();move(ev.touches[0]);},{passive:false})
+    .on('touchend',hide);
+
+  function move(ev){
+    const [mx] = d3.pointer(ev, svg.node());
+    const yr = Math.max(Y0,Math.min(YN, Math.round(x.invert(mx-m.l))));
+    const d = data.find(r=>r.year===yr); if(!d) return;
+    guide.style('opacity',1).attr('x1',x(yr)).attr('x2',x(yr));
+    focus.style('opacity',1).attr('cx',x(yr)).attr('cy',y(d.net));
+    showTip(d, x(yr)+m.l, y(d.net)+m.t);
+  }
+  function hide(){ guide.style('opacity',0); focus.style('opacity',0); tt.style.opacity=0; }
+  dims={x,y,m,W};
+}
+
+function showTip(d,px,py){
+  const rows = COSTKEYS.map(ck=>
+    `<div class="row"><span><i class="dot" style="background:${ck.color}"></i>${ck.label}</span><span class="num">${fmtP(d.c[ck.k])}</span></div>`).join('')
+   + BENKEYS.map(bk=>
+    `<div class="row"><span><i class="dot" style="background:${bk.color}"></i>${bk.label}</span><span class="num">−${fmtP(d.b[bk.k])}</span></div>`).join('');
+  const verdict = d.net>=0 ? 'local would be cheaper' : 'coordination pays';
+  tt.innerHTML =
+    `<h4><span>${d.year}</span><span class="num">${fmt(d.net)}</span></h4>${rows}
+     <div class="row tot"><span>Net Price of Coordination</span><span class="num">${fmt(d.net)}</span></div>
+     <div class="row" style="color:${d.net>=0?'var(--cost)':'var(--benefit)'};font-weight:600;margin-top:2px"><span>${verdict}</span><span></span></div>`;
+  const cw = chartEl.clientWidth;
+  let left = px+16; if(left+210>cw) left = px-210;
+  tt.style.left = Math.max(4,left)+'px';
+  tt.style.top = Math.max(4,py-20)+'px';
+  tt.style.opacity = 1;
+}
+
+// ---------------------------------------------------------------------------
+// READOUT (defaults to latest year)
+// ---------------------------------------------------------------------------
+function updateReadout(){
+  const data = buildData(state);
+  const d = data.find(r=>r.year===2030) || data[data.length-1];
+  const cy = crossingYear(data);
+  const pays = d.net<0;
+  const cls = pays?'pays':'local';
+  document.getElementById('readout').innerHTML = `
+    <div class="verdict ${cls}">${pays
+      ? 'In 2030, coupling still pays for itself.'
+      : 'By 2030, coordinating costs more than going local.'}</div>
+    <div><div class="k">Net PoC · 2030</div><div class="big ${cls}">${fmt(d.net)}</div></div>
+    <div>
+      <div class="k">Break-even year</div>
+      <div class="yr" style="font-family:'IBM Plex Mono',monospace;font-size:20px;color:var(--accent);font-weight:600">
+        ${cy?Math.round(cy):'—'}</div>
+      <div class="yr">${cy? 'net turns positive here' : 'coupling pays across the whole window'}</div>
+    </div>`;
+  const note = document.getElementById('verdict-note');
+  note.innerHTML = pays
+    ? `Under these assumptions the widest-dispatch, reserve-pooling and curtailment-avoidance benefits still outrun the redispatch bill and the transfers. The localist case gets stronger as you raise grid-lag or the weight on distributional transfers — push either up and watch the break-even line march earlier.`
+    : `Here the gap between what the market schedules and what the grid can carry (grid-lag) plus the transfer burden overwhelms the coupling gains. Note this is the fragile-but-defensible version of the "produce local, consume local" thesis: it holds when the grid keeps trailing the market, not as a general law.`;
+}
+
+// ---------------------------------------------------------------------------
+// CONTROLS
+// ---------------------------------------------------------------------------
+const baselineHints = {
+  zero:  'Generous to coupling: compares against literally zero cross-border trade (ENTSO-E’s ≈ €34 bn "zero scenario").',
+  incr:  'The fair marginal question: what does more integration add on top of today? (~€13 bn/yr in TYNDP 2024).',
+  copper:'Toughest on coupling: measures only the gap to an ideal, fully-built grid — most of the prize is already banked.'
+};
+function syncSlider(id){
+  const el=document.getElementById(id);
+  el.style.setProperty('--fill', el.value+'%');
+}
+function syncUI(){
+  // baseline
+  document.querySelectorAll('#baseline button').forEach(b=>
+    b.setAttribute('aria-pressed', b.dataset.v===state.baseline));
+  document.getElementById('baseline-hint').textContent = baselineHints[state.baseline];
+  // sliders
+  const lag=document.getElementById('lag'), dist=document.getElementById('dist');
+  lag.value=state.lag; dist.value=state.dist;
+  document.getElementById('lag-val').textContent = state.lag+'%';
+  document.getElementById('dist-val').textContent = (state.dist/100).toFixed(2);
+  syncSlider('lag'); syncSlider('dist');
+}
+function refresh(){ syncUI(); render(); updateReadout(); }
+
+document.querySelectorAll('#baseline button').forEach(b=>
+  b.addEventListener('click',()=>{ state.baseline=b.dataset.v; refresh(); }));
+document.getElementById('lag').addEventListener('input',e=>{ state.lag=+e.target.value; refresh(); });
+document.getElementById('dist').addEventListener('input',e=>{ state.dist=+e.target.value; refresh(); });
+document.querySelectorAll('.presets button').forEach(b=>
+  b.addEventListener('click',()=>{ state={...PRESETS[b.dataset.p]}; refresh(); }));
+document.getElementById('reset').addEventListener('click',()=>{ state={...DEFAULTS}; refresh(); });
+
+let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(render,120); });
+
+refresh();
+</script>
+</body>
+</html>
