@@ -2,6 +2,12 @@
 
 An interactive D3.js visualization that asks a blunt question about EU electricity markets: **does coupling bidding zones actually pay for itself — and if so, for how much longer?**
 
+<p align="center">
+  <a href="https://namakshenas.github.io/price-of-coordination/">
+    <img src="https://img.shields.io/badge/Live_Demo-Open_the_app-2e5fe6?style=for-the-badge&logo=githubpages&logoColor=white" alt="Live Demo">
+  </a>
+</p>
+
 The EU's answer to the energy transition is to coordinate electricity across dozens of bidding zones through a single coupled market. That coordination lowers generation costs, but it isn't free: redispatch, interconnector capital, cross-zone transfers, and the growing gap between what the market schedules and what the grid can physically carry. This tool defines a metric — the **Price of Coordination (PoC)** — that nets those costs against what coupling actually saves, and plots it over time so you can see the year the trade flips.
 
 ![price-of-coordination](POC.png)
